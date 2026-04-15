@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import { useAuth } from '@clerk/nextjs';
-import { createSupabaseClient } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 
 interface BookResult {
   key: string;
@@ -14,7 +14,7 @@ interface BookResult {
 }
 
 export default function SearchPage() {
-  const { userId, getToken } = useAuth();
+  const { userId } = useAuth();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<BookResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -40,27 +40,22 @@ export default function SearchPage() {
     if (!userId) return;
     setSavingKey(book.key);
 
-    try {
-      const token = await getToken();
-      const supabase = createSupabaseClient(token ?? undefined);
+    const coverUrl = book.cover_i
+      ? `https://covers.openlibrary.org/b/id/${book.cover_i}-M.jpg`
+      : '';
 
-      const coverUrl = book.cover_i
-        ? `https://covers.openlibrary.org/b/id/${book.cover_i}-M.jpg`
-        : '';
+    const { error } = await supabase.from('favorites').insert({
+      user_id: userId,
+      title: book.title,
+      author: book.author_name?.[0] || 'Unknown',
+      cover_url: coverUrl,
+      ol_key: book.key,
+    });
 
-      const { error } = await supabase.from('favorites').insert({
-        user_id: userId,
-        title: book.title,
-        author: book.author_name?.[0] || 'Unknown',
-        cover_url: coverUrl,
-        ol_key: book.key,
-      });
-
-      if (!error) {
-        setSavedKeys((prev) => new Set(prev).add(book.key));
-      }
-    } catch {
-      // silently fail
+    if (error) {
+      console.error('save favorite failed', error);
+    } else {
+      setSavedKeys((prev) => new Set(prev).add(book.key));
     }
     setSavingKey(null);
   }

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { useAuth } from '@clerk/nextjs';
-import { createSupabaseClient } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 
 interface Favorite {
   id: number;
@@ -16,7 +16,7 @@ interface Favorite {
 }
 
 export default function MyBooksPage() {
-  const { userId, getToken } = useAuth();
+  const { userId } = useAuth();
   const [books, setBooks] = useState<Favorite[]>([]);
   const [loading, setLoading] = useState(true);
   const [removingId, setRemovingId] = useState<number | null>(null);
@@ -25,9 +25,6 @@ export default function MyBooksPage() {
     if (!userId) return;
 
     async function fetchMyBooks() {
-      const token = await getToken();
-      const supabase = createSupabaseClient(token ?? undefined);
-
       const { data, error } = await supabase
         .from('favorites')
         .select('*')
@@ -40,14 +37,17 @@ export default function MyBooksPage() {
       setLoading(false);
     }
     fetchMyBooks();
-  }, [userId, getToken]);
+  }, [userId]);
 
   async function handleRemove(id: number) {
+    if (!userId) return;
     setRemovingId(id);
-    const token = await getToken();
-    const supabase = createSupabaseClient(token ?? undefined);
 
-    const { error } = await supabase.from('favorites').delete().eq('id', id);
+    const { error } = await supabase
+      .from('favorites')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', userId);
 
     if (!error) {
       setBooks((prev) => prev.filter((b) => b.id !== id));
