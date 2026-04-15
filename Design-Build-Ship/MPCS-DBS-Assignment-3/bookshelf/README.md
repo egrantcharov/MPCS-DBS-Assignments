@@ -1,65 +1,77 @@
 # Bookshelf
 
-A tiny class-shared bookshelf. Sign in, search [Open Library](https://openlibrary.org/dev/docs/api/search) for a book, save it to your favorites, and see what the rest of the class is reading on the home page.
+A class bookshelf. Sign in, search Open Library for a book, save it, and see what everyone else in the class is reading on the home page.
 
-Built for MPCS 51039 *Design, Build, Ship* — Assignment 3.
+Built for MPCS 51039 Design, Build, Ship, Assignment 3.
 
-## Live
+## Links
 
-- **App**: _add Vercel URL after first deploy_
-- **Repo**: https://github.com/egrantcharov/MPCS-DBS-Assignments
+- **Live app**: _add Vercel URL once deployed_
+- **Repo**: https://github.com/egrantcharov/MPCS-DBS-Assignments (this folder: `Design-Build-Ship/MPCS-DBS-Assignment-3/bookshelf`)
 
 ## Stack
 
-| Layer    | Tech                                                   |
-| -------- | ------------------------------------------------------ |
-| Frontend | Next.js 16 (App Router), React 19, Tailwind v4         |
-| Auth     | Clerk (`@clerk/nextjs`) — sign-up, sign-in, sign-out   |
-| Database | Supabase Postgres + Row Level Security                 |
-| API      | Open Library Search (`openlibrary.org/search.json`)    |
-| Host     | Vercel                                                 |
+- Next.js 16 (App Router) + React 19 + Tailwind v4
+- Clerk for auth (sign up, sign in, sign out)
+- Supabase Postgres for storing favorites, with Row Level Security on
+- Open Library search API for book data (called from a Next.js API route, not the browser)
+- Vercel for hosting
 
 ## Local setup
 
 ```bash
 npm install
-cp .env.local.example .env.local   # then fill in Clerk + Supabase keys
+cp .env.local.example .env.local   # fill in Clerk + Supabase keys
 npm run dev                         # http://localhost:3000
 ```
 
-Apply the database schema by pasting `supabase/migrations/001_create_favorites.sql` into the Supabase SQL editor (or run it through the Supabase MCP).
+Then paste `supabase/migrations/001_create_favorites.sql` into the Supabase SQL editor to create the `favorites` table.
 
 ## Reflection
 
-> **Trace one request — e.g. signing up, calling the external API, saving to the database, and reloading the browser. What systems are involved?**
+### 1. Trace a request: a user searches, saves, and views it on their profile. What systems are involved?
 
-Hitting "Sign up" on the navbar opens Clerk's modal; Clerk handles the whole account creation flow against their API and sets a session cookie on `bookshelf.vercel.app`. After sign-in, typing a query on `/search` fires a `fetch` from the browser directly to `openlibrary.org/search.json` — no server of ours is involved, it's a public JSON API. When the user clicks "Add to favorites" we ask Clerk for a short-lived session token (`await getToken()`), build a Supabase client with that token in the `Authorization` header, and POST to Supabase's REST endpoint (`/rest/v1/favorites`). Supabase's PostgREST service validates the token (if the Clerk third-party auth integration is configured) and, if the RLS policy allows it, runs the `INSERT` against Postgres. On reload, `/` makes a plain anonymous `SELECT * from favorites` — the "public read" RLS policy lets that through. End-to-end: **browser → Clerk → browser → Open Library → browser → Supabase/Postgres → browser**.
+User is signed into Clerk, so there's already a Clerk session cookie on the browser.
 
-> **Why do we include the publishable Clerk key as an env variable, but not the API key?**
+1. User types "dune" on `/search` and hits submit. The browser calls `/api/search?q=dune` on my Next.js app. That API route runs on Vercel's server, calls `openlibrary.org/search.json`, and returns the results.
+2. User clicks "Add to Favorites" on a result. The page calls `getToken()` to get a Clerk session JWT, builds a Supabase client with that token in the Authorization header, and sends a POST to Supabase's REST endpoint (`/rest/v1/favorites`). Supabase checks the token, checks the RLS policy, and writes the row into Postgres.
+3. User navigates to `/my-books`. Same thing in reverse: Clerk token to Supabase, SELECT filtered by `user_id` that matches the Clerk `sub`, RLS allows the read, rows come back and render.
 
-Anything prefixed with `NEXT_PUBLIC_` gets baked into the JavaScript bundle that ships to every visitor's browser. Clerk's *publishable* key is explicitly designed for that — it identifies your Clerk instance so the front-end SDK can start a sign-in flow, but it can't do anything sensitive on its own. The *secret* key (`CLERK_SECRET_KEY`) can mint sessions, read any user's data, and impersonate backend calls, so it has to stay on the server where the browser never sees it. Same pattern with Supabase's publishable key vs. the service-role key. Rule of thumb: if leaking it on a sticky note would ruin your week, it doesn't belong in `NEXT_PUBLIC_*`.
+So the systems are: the browser, Clerk (auth), my Next.js app on Vercel (server route for the external API call), Open Library (third-party API), and Supabase (Postgres + PostgREST + RLS).
 
-> **A classmate is building something that could use Supabase as a key-value store. What would you recommend?**
+### 2. Why should your app call the external API from the server (API route) instead of directly from the browser?
 
-Totally doable and a pretty good fit. Recommend a small two-column table: `key TEXT PRIMARY KEY, value JSONB NOT NULL, updated_at TIMESTAMPTZ DEFAULT NOW()`. JSONB is the unlock — Postgres can index into it (`->`, `->>`, `@>`), so you get querying when you need it without paying for it when you don't. Turn RLS on from day one and scope it to `auth.jwt() ->> 'sub'` so each user only touches their own keys. For hot-read workloads, use an `UPSERT` (`insert ... on conflict (key) do update`) rather than read-then-write, and if the values get big, stash them in Supabase Storage and keep the key/URL in the row. If they're only ever reading/writing by key and don't care about queries, they'd get a simpler life with Upstash Redis — but the moment they want "give me all keys where value.status = 'done'", Supabase wins.
+A few reasons:
 
-> **Asked Claude to model a database for this project — why I went with what I went with.**
+- If the API ever needed a key, the key would leak if I called it from the browser. Doing it server-side keeps secrets on the server. Open Library does not need a key right now, but this keeps the pattern correct for the next API I add.
+- CORS. Not every API sets permissive CORS headers. A server route avoids the whole problem since it is just a server-to-server fetch.
+- Caching and rate limiting. My API route uses Next's `revalidate: 300` so repeat queries within 5 minutes do not re-hit Open Library. I could not do that cleanly from the browser.
+- Shape control. I only return the fields the UI needs (`key`, `title`, `author_name`, `cover_i`, `first_publish_year`) instead of shipping the whole Open Library response to the client.
+- One place to change. If I swap Open Library for Google Books later, only the server route changes. The page code stays the same.
 
-The shape is intentionally tiny: a single `favorites` table. Every row is one user saving one book: `(user_id, title, author, cover_url, ol_key, created_at)`, with `(user_id, ol_key)` unique so you can't double-save the same book. I didn't split `books` into its own table because Open Library *is* my canonical book database — storing the `ol_key` is enough to re-fetch anything richer later, and denormalizing `title`/`author`/`cover_url` keeps the public home page one query instead of a join. I didn't add a `users` table either, since Clerk owns identity; `user_id` is just the Clerk `sub` claim as `TEXT`. RLS is on: public read (it's a shared bookshelf, that's the point), and per-user write scoped by the Clerk JWT.
+### 3. A classmate signs up on your app. What data does Clerk store vs. what does Supabase store? How are they connected?
 
-## Database schema
+Clerk stores the identity stuff: the user's email, password hash, any OAuth linked accounts, the session tokens, sign-in history, and metadata like first and last name. I never see the password and I do not keep a users table.
 
-```sql
-create table favorites (
-  id         bigint generated always as identity primary key,
-  user_id    text        not null,
-  title      text        not null,
-  author     text        not null default 'Unknown',
-  cover_url  text        not null default '',
-  ol_key     text        not null,
-  created_at timestamptz not null default now(),
-  unique (user_id, ol_key)
-);
-```
+Supabase stores the app data: the `favorites` rows. Each row has the book info (`title`, `author`, `cover_url`, `ol_key`), a `created_at`, and a `user_id`.
 
-Full migration including RLS policies: [`supabase/migrations/001_create_favorites.sql`](supabase/migrations/001_create_favorites.sql).
+The connection is that `user_id` column. It holds the Clerk user's `sub` claim (something like `user_2abc...`). When a user saves a book, the app reads the Clerk userId on the client and writes it into the row. When the app needs "my books", it filters `favorites` where `user_id = currentClerkUserId`. The Clerk session JWT is also passed to Supabase so RLS can verify the user on writes.
+
+### 4. Ask Claude (with MCP) to describe your database. Paste the response. Does it match your mental model?
+
+I do not have the Supabase MCP wired up locally, so I asked Claude to describe the schema from the migration file. Response:
+
+> You have one table, `favorites`, in the `public` schema. Columns:
+> - `id` (bigint, identity, primary key)
+> - `user_id` (text, not null): stores the Clerk user's `sub` claim
+> - `title` (text, not null)
+> - `author` (text, not null, defaults to "Unknown")
+> - `cover_url` (text, not null, defaults to empty string)
+> - `ol_key` (text, not null): the Open Library work key
+> - `created_at` (timestamptz, defaults to `now()`)
+>
+> There is a unique constraint on `(user_id, ol_key)` so a user cannot save the same book twice. Indexes exist on `user_id` and on `created_at DESC`.
+>
+> Row Level Security is enabled with three policies: public SELECT (anyone can read all favorites), and permissive INSERT and DELETE (would be tightened to `auth.jwt() ->> 'sub' = user_id` once Clerk's third-party auth is set up on the Supabase side).
+
+That matches what I expected. One table, per-user rows, Clerk id as the join key, denormalized book fields so the home page is a single query. The only thing worth noting is that the RLS on writes is still permissive for the assignment, and I would tighten it once the Clerk and Supabase third-party auth integration is configured in the Supabase dashboard.

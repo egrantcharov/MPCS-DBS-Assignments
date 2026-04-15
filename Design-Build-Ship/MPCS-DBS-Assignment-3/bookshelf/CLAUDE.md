@@ -6,7 +6,7 @@ save favorites, and see what everyone else is reading on the home page.
 ## Stack
 
 - **Framework**: Next.js 16 (App Router, Turbopack)
-- **Auth**: Clerk (`@clerk/nextjs`) — sign-up, sign-in, sign-out, session tokens
+- **Auth**: Clerk (`@clerk/nextjs`): sign-up, sign-in, sign-out, session tokens
 - **Database**: Supabase Postgres (`@supabase/supabase-js`) with RLS enabled
 - **External API**: [Open Library Search API](https://openlibrary.org/dev/docs/api/search) (no key required)
 - **Styling**: Tailwind v4 (utility classes only, no custom component library)
@@ -14,14 +14,15 @@ save favorites, and see what everyone else is reading on the home page.
 
 ## Layout
 
-- `src/app/page.tsx` — public home page; reads `favorites` from Supabase
-- `src/app/search/page.tsx` — client-side search against Open Library; "Add to favorites" writes to Supabase as the signed-in user
-- `src/app/my-books/page.tsx` — signed-in user's saved books, with remove
-- `src/app/sign-in/[[...sign-in]]`, `src/app/sign-up/[[...sign-up]]` — Clerk hosted pages
-- `src/components/Navbar.tsx` — sticky top nav with Clerk `UserButton`
-- `src/lib/supabase.ts` — Supabase client factory (passes Clerk JWT to Supabase)
-- `src/proxy.ts` — Clerk middleware (replaces `middleware.ts` in Next.js 16)
-- `supabase/migrations/001_create_favorites.sql` — schema + RLS
+- `src/app/page.tsx`: public home page; reads `favorites` from Supabase
+- `src/app/search/page.tsx`: search UI; fetches `/api/search` which calls Open Library server-side. "Add to favorites" writes to Supabase as the signed-in user
+- `src/app/api/search/route.ts`: Next.js route handler that proxies Open Library search (adds caching, field selection, User-Agent)
+- `src/app/my-books/page.tsx`: signed-in user's saved books, with remove
+- `src/app/sign-in/[[...sign-in]]`, `src/app/sign-up/[[...sign-up]]`: Clerk hosted pages
+- `src/components/Navbar.tsx`: sticky top nav with Clerk `UserButton`
+- `src/lib/supabase.ts`: Supabase client factory (passes Clerk JWT to Supabase)
+- `src/proxy.ts`: Clerk middleware (replaces `middleware.ts` in Next.js 16)
+- `supabase/migrations/001_create_favorites.sql`: schema + RLS
 
 ## Style preferences
 
