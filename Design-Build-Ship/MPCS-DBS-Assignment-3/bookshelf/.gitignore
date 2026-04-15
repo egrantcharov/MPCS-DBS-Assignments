@@ -20,6 +20,10 @@
 # production
 /build
 
+# override home-dir python .gitignore rules that would ignore source folders
+!src/lib/
+!src/lib/**
+
 # misc
 .DS_Store
 *.pem
