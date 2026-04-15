@@ -27,9 +27,7 @@ export default function SearchPage() {
 
     setLoading(true);
     try {
-      const res = await fetch(
-        `https://openlibrary.org/search.json?q=${encodeURIComponent(query)}&limit=12`
-      );
+      const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
       const data = await res.json();
       setResults(data.docs || []);
     } catch {
