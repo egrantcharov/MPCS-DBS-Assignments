@@ -6,7 +6,7 @@ Built for MPCS 51039 Design, Build, Ship, Assignment 3.
 
 ## Links
 
-- **Live app**: _add Vercel URL once deployed_
+- **Live app**: https://bookshelf-topaz-three.vercel.app
 - **Repo**: https://github.com/egrantcharov/MPCS-DBS-Assignments (this folder: `Design-Build-Ship/MPCS-DBS-Assignment-3/bookshelf`)
 
 ## Stack
