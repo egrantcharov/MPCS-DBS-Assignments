@@ -14,8 +14,42 @@ interface Favorite {
   created_at: string;
 }
 
+interface BookCard {
+  ol_key: string;
+  title: string;
+  author: string;
+  cover_url: string;
+  saves: number;
+  latest: string;
+}
+
+function groupByBook(rows: Favorite[]): BookCard[] {
+  const byKey = new Map<string, BookCard>();
+  for (const row of rows) {
+    const existing = byKey.get(row.ol_key);
+    if (existing) {
+      existing.saves += 1;
+      if (row.created_at > existing.latest) existing.latest = row.created_at;
+    } else {
+      byKey.set(row.ol_key, {
+        ol_key: row.ol_key,
+        title: row.title,
+        author: row.author,
+        cover_url: row.cover_url,
+        saves: 1,
+        latest: row.created_at,
+      });
+    }
+  }
+  return [...byKey.values()].sort((a, b) => {
+    if (b.saves !== a.saves) return b.saves - a.saves;
+    return b.latest.localeCompare(a.latest);
+  });
+}
+
 export default function HomePage() {
-  const [favorites, setFavorites] = useState<Favorite[]>([]);
+  const [books, setBooks] = useState<BookCard[]>([]);
+  const [readerCount, setReaderCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -26,7 +60,9 @@ export default function HomePage() {
         .order('created_at', { ascending: false });
 
       if (!error && data) {
-        setFavorites(data);
+        const favs = data as Favorite[];
+        setBooks(groupByBook(favs));
+        setReaderCount(new Set(favs.map((f) => f.user_id)).size);
       }
       setLoading(false);
     }
@@ -38,18 +74,24 @@ export default function HomePage() {
       <div className="mb-8 text-center">
         <h1 className="text-4xl font-bold text-gray-900">Class Bookshelf</h1>
         <p className="mt-2 text-lg text-gray-600">
-          Books our class loves. Search and add yours!
+          Books our class loves. Search and add yours.
         </p>
+        {!loading && books.length > 0 && (
+          <p className="mt-1 text-sm text-gray-500">
+            {books.length} {books.length === 1 ? 'book' : 'books'} saved by{' '}
+            {readerCount} {readerCount === 1 ? 'classmate' : 'classmates'}
+          </p>
+        )}
       </div>
 
       {loading ? (
         <div className="flex justify-center py-20">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
         </div>
-      ) : favorites.length === 0 ? (
+      ) : books.length === 0 ? (
         <div className="rounded-xl border border-gray-200 bg-white p-12 text-center">
           <p className="text-lg text-gray-500">
-            No books yet! Be the first to add one.
+            No books yet. Be the first to add one.
           </p>
           <a
             href="/search"
@@ -60,11 +102,16 @@ export default function HomePage() {
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-          {favorites.map((book) => (
+          {books.map((book) => (
             <div
-              key={book.id}
-              className="group rounded-xl border border-gray-200 bg-white p-3 shadow-sm transition-all hover:shadow-md hover:scale-[1.02]"
+              key={book.ol_key}
+              className="group relative rounded-xl border border-gray-200 bg-white p-3 shadow-sm transition-all hover:shadow-md hover:scale-[1.02]"
             >
+              {book.saves > 1 && (
+                <span className="absolute right-2 top-2 z-10 rounded-full bg-indigo-600 px-2 py-0.5 text-xs font-semibold text-white shadow">
+                  {book.saves}
+                </span>
+              )}
               <div className="relative aspect-[2/3] overflow-hidden rounded-lg bg-gray-100">
                 {book.cover_url ? (
                   <Image
@@ -86,6 +133,11 @@ export default function HomePage() {
                 {book.title}
               </h3>
               <p className="text-xs text-gray-500 line-clamp-1">{book.author}</p>
+              <p className="mt-1 text-xs text-indigo-600">
+                {book.saves === 1
+                  ? 'saved by 1 classmate'
+                  : `saved by ${book.saves} classmates`}
+              </p>
             </div>
           ))}
         </div>
