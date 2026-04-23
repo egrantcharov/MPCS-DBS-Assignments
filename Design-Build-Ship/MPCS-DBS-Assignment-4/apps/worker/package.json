@@ -1,0 +1,21 @@
+{
+  "name": "@clutch/worker",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "start:once": "tsx src/index.ts --once"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.102.1",
+    "dotenv": "^16.4.7"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  }
+}
