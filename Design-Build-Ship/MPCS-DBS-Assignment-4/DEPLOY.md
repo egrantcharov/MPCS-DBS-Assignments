@@ -44,7 +44,7 @@ All four have free tiers that are plenty for this project. Budget ~20 minutes en
 ## 3. Railway (worker)
 
 1. Go to <https://railway.com> and create a new project → **Deploy from GitHub repo**.
-2. Select this repo. Set **Root Directory** to `Design-Build-Ship/MPCS-DBS-Assignment-4` (the monorepo root). Railway will discover `apps/worker/railway.json` → `apps/worker/Dockerfile`.
+2. Select this repo. Set **Root Directory** to `Design-Build-Ship/MPCS-DBS-Assignment-4/apps/worker`. Railway will use that folder's `railway.json` → `Dockerfile`.
 3. Add environment variables under **Variables**:
    - `SUPABASE_URL`
    - `SUPABASE_SERVICE_ROLE_KEY`
