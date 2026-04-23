@@ -1,0 +1,15 @@
+{
+  "name": "clutch-index",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev -w @clutch/web",
+    "dev:worker": "npm run dev -w @clutch/worker",
+    "build:web": "npm run build -w @clutch/web",
+    "build:worker": "npm run build -w @clutch/worker",
+    "lint:web": "npm run lint -w @clutch/web"
+  }
+}
