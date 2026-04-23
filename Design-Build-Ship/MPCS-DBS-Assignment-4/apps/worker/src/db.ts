@@ -13,6 +13,7 @@ export const supabase = createClient(url, serviceKey, {
 
 export interface GameRow {
   game_pk: number;
+  sport: string;
   game_date: string;
   status: string;
   detailed_state: string | null;
@@ -33,10 +34,13 @@ export interface GameRow {
   leverage: number | null;
   clutch_index: number | null;
   game_start: string | null;
+  period_label: string | null;
+  clock: string | null;
 }
 
 export interface PlayRow {
   game_pk: number;
+  sport: string;
   at_bat_index: number;
   inning: number | null;
   is_top_inning: boolean | null;
@@ -53,11 +57,25 @@ export interface PlayRow {
 
 export interface TeamRow {
   id: number;
+  sport: string;
   abbreviation: string;
   name: string;
   location: string | null;
   league: string | null;
   division: string | null;
+  logo_url: string | null;
+}
+
+export interface HighlightRow {
+  sport: string;
+  game_pk: number;
+  at_bat_index: number | null;
+  event: string | null;
+  description: string | null;
+  captivating_index: number | null;
+  home_win_prob: number | null;
+  wp_delta: number | null;
+  occurred_at: string;
 }
 
 export async function upsertTeams(teams: TeamRow[]) {
@@ -80,28 +98,33 @@ export async function upsertPlays(plays: PlayRow[]) {
   if (error) throw new Error(`upsertPlays: ${error.message}`);
 }
 
-export async function listActiveGamePks(today: string): Promise<number[]> {
+export async function insertHighlights(rows: HighlightRow[]) {
+  if (!rows.length) return;
+  const { error } = await supabase.from('highlights').insert(rows);
+  if (error) console.warn('insertHighlights:', error.message);
+}
+
+export async function latestHighlightIndex(sport: string, gamePk: number): Promise<number> {
   const { data, error } = await supabase
-    .from('games')
-    .select('game_pk,status')
-    .eq('game_date', today);
-  if (error) throw new Error(`listActiveGamePks: ${error.message}`);
-  return (data ?? [])
-    .filter((g) => g.status === 'Live' || g.status === 'Preview')
-    .map((g) => g.game_pk as number);
+    .from('highlights')
+    .select('at_bat_index')
+    .eq('sport', sport)
+    .eq('game_pk', gamePk)
+    .order('at_bat_index', { ascending: false })
+    .limit(1);
+  if (error || !data || data.length === 0) return -1;
+  return (data[0]?.at_bat_index as number | null) ?? -1;
 }
 
 export async function setHealth(ok: boolean, message?: string) {
+  const { data } = await supabase.from('worker_health').select('error_count').eq('id', 1).single();
+  const nextErr = ok ? 0 : (data?.error_count ?? 0) + 1;
   const { error } = await supabase
     .from('worker_health')
     .update({
       last_poll_at: new Date().toISOString(),
       last_error: ok ? null : message ?? 'unknown',
-      error_count: ok
-        ? 0
-        : ((
-            await supabase.from('worker_health').select('error_count').eq('id', 1).single()
-          ).data?.error_count ?? 0) + 1,
+      error_count: nextErr,
     })
     .eq('id', 1);
   if (error) console.warn('setHealth:', error.message);
