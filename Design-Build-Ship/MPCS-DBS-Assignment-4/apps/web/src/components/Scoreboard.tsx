@@ -66,15 +66,27 @@ export default function Scoreboard({
     (g.home_team_id != null && starred.has(g.home_team_id)) ||
     (g.away_team_id != null && starred.has(g.away_team_id));
 
-  const displayLive = showOnlyFavs
-    ? liveGames.filter(isStarred)
-    : liveGames.filter((g) =>
-        isStarred(g) ||
-        (g.clutch_index ?? 0) >= clutchThreshold,
-      );
+  const displayLive = showOnlyFavs ? liveGames.filter(isStarred) : liveGames;
+  const clutchFloor = Number(clutchThreshold) || 0;
+  const hotGames = liveGames
+    .filter((g) => !isStarred(g) && (g.clutch_index ?? 0) >= clutchFloor && clutchFloor > 0)
+    .sort((a, b) => (b.clutch_index ?? 0) - (a.clutch_index ?? 0));
 
   return (
     <div className="space-y-10">
+      {hotGames.length > 0 && (
+        <Section
+          title={`Hot right now · CI ≥ ${Math.round(clutchFloor)}`}
+          count={hotGames.length}
+        >
+          <Grid>
+            {hotGames.map((g) => (
+              <GameCard key={`hot-${g.game_pk}`} game={g} teams={teamMap} starred />
+            ))}
+          </Grid>
+        </Section>
+      )}
+
       {displayLive.length > 0 && (
         <Section title="Live now" count={displayLive.length}>
           <Grid>
