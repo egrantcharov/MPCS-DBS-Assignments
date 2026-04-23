@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import type { WorkerHealth } from '@/lib/types';
 
-const STALE_MS = 90_000;
+const STALE_MS = 75_000;
 
 export default function WorkerStatusChip() {
   const [health, setHealth] = useState<WorkerHealth | null>(null);

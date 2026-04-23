@@ -380,12 +380,11 @@ async function tick(teamIds: Set<number>) {
   try {
     if (Date.now() - state.lastScheduleAt >= SCHEDULE_INTERVAL_MS) {
       await refreshMlbSchedule(teamIds);
-      await refreshNhl();
       state.lastScheduleAt = Date.now();
-      await setHealth(true);
     }
     await refreshLiveMlbGames();
     await refreshNhl(); // NHL /score/now is a single call, cheap; refresh each tick
+    await setHealth(true); // heartbeat per tick so the /status chip is accurate
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[tick] fatal:', msg);
