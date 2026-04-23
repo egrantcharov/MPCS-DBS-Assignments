@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Show, SignInButton, UserButton } from '@clerk/nextjs';
+import WorkerStatusChip from './WorkerStatusChip';
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -10,7 +11,9 @@ export default function Navbar() {
   const links = [
     { href: '/', label: 'Scoreboard' },
     { href: '/dashboard', label: 'My Dashboard' },
+    { href: '/highlights', label: 'Highlights' },
     { href: '/settings', label: 'Settings' },
+    { href: '/about', label: 'About' },
   ];
 
   return (
@@ -37,6 +40,7 @@ export default function Navbar() {
               </Link>
             );
           })}
+          <WorkerStatusChip />
           <Show when="signed-in">
             <UserButton />
           </Show>

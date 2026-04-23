@@ -4,6 +4,8 @@ import { useState, useTransition } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { Team, UserPrefs } from '@/lib/types';
 import TeamChip from '@/components/TeamChip';
+import NotificationsToggle from '@/components/NotificationsToggle';
+import SportBadge from '@/components/SportBadge';
 
 export default function SettingsEditor({
   userId,
@@ -80,32 +82,49 @@ export default function SettingsEditor({
           Starred teams
         </h2>
         <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
-          Their games appear pinned on the scoreboard and dashboard.
+          Their games appear pinned on the scoreboard and dashboard and can trigger browser alerts.
         </p>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
-          {teams.map((t) => {
-            const on = favs.has(t.id);
-            return (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => toggleFav(t.id)}
-                className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left transition-colors ${
-                  on
-                    ? 'border-indigo-500 bg-indigo-50 dark:border-indigo-400 dark:bg-indigo-950/40'
-                    : 'border-slate-200 hover:border-slate-300 dark:border-slate-800 dark:hover:border-slate-700'
-                }`}
-              >
-                <TeamChip teamId={t.id} abbreviation={t.abbreviation} size="sm" />
-                <span className="truncate text-sm text-slate-800 dark:text-slate-200">
-                  {t.name}
+
+        {(['mlb', 'nhl'] as const).map((sp) => {
+          const leagueTeams = teams.filter((t) => t.sport === sp);
+          if (leagueTeams.length === 0) return null;
+          return (
+            <div key={sp} className="mb-6 last:mb-0">
+              <div className="mb-2 flex items-center gap-2">
+                <SportBadge sport={sp} />
+                <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  {leagueTeams.length} teams
                 </span>
-                {on && <span className="ml-auto text-xs text-indigo-600">★</span>}
-              </button>
-            );
-          })}
-        </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
+                {leagueTeams.map((t) => {
+                  const on = favs.has(t.id);
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => toggleFav(t.id)}
+                      className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left transition-colors ${
+                        on
+                          ? 'border-indigo-500 bg-indigo-50 dark:border-indigo-400 dark:bg-indigo-950/40'
+                          : 'border-slate-200 hover:border-slate-300 dark:border-slate-800 dark:hover:border-slate-700'
+                      }`}
+                    >
+                      <TeamChip teamId={t.id} abbreviation={t.abbreviation} size="sm" />
+                      <span className="truncate text-sm text-slate-800 dark:text-slate-200">
+                        {t.name}
+                      </span>
+                      {on && <span className="ml-auto text-xs text-indigo-600">★</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
       </section>
+
+      <NotificationsToggle />
 
       <section className="rounded-xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
         <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">

@@ -1,9 +1,10 @@
 import Link from 'next/link';
 import ClutchBadge from './ClutchBadge';
 import LiveDot from './LiveDot';
+import SportBadge from './SportBadge';
 import TeamChip from './TeamChip';
 import type { Game, Team } from '@/lib/types';
-import { formatClock, formatInning, formatStatus, formatWp } from '@/lib/format';
+import { formatClock, formatStatus, formatWp } from '@/lib/format';
 
 export default function GameCard({
   game,
@@ -19,6 +20,9 @@ export default function GameCard({
   const isLive = game.status === 'Live';
   const isFinal = game.status === 'Final';
   const wpHome = game.home_win_prob;
+  const isMlb = game.sport === 'mlb';
+
+  const periodBits = [game.period_label, game.clock].filter(Boolean).join(' · ');
 
   return (
     <Link
@@ -31,12 +35,12 @@ export default function GameCard({
     >
       <div className="mb-2 flex items-center justify-between">
         <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+          <SportBadge sport={game.sport} />
           {isLive ? <LiveDot /> : isFinal ? <span className="font-semibold text-slate-700 dark:text-slate-300">Final</span> : <span>{formatClock(game.game_start)}</span>}
-          <span>·</span>
-          <span>{formatStatus(game.status, game.detailed_state)}</span>
-          {isLive && <span>· {formatInning(game.inning, game.is_top_inning)}</span>}
+          {isLive && periodBits && <span>· {periodBits}</span>}
+          {!isLive && game.detailed_state && <span className="truncate">· {formatStatus(game.status, game.detailed_state)}</span>}
         </div>
-        {isLive && <ClutchBadge value={game.clutch_index} />}
+        {isLive && isMlb && <ClutchBadge value={game.clutch_index} />}
       </div>
 
       <div className="flex items-center justify-between gap-3">
@@ -61,7 +65,7 @@ export default function GameCard({
         </div>
       </div>
 
-      {isLive && wpHome != null && (
+      {isLive && isMlb && wpHome != null && (
         <div className="mt-3">
           <div className="mb-1 flex items-center justify-between text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
             <span>{away?.abbreviation ?? 'AWAY'} {formatWp(1 - wpHome)}</span>
@@ -77,10 +81,13 @@ export default function GameCard({
         </div>
       )}
 
-      {isLive && game.last_play && (
+      {isLive && isMlb && game.last_play && (
         <p className="mt-3 line-clamp-2 text-xs text-slate-500 dark:text-slate-400">
           {game.last_play}
         </p>
+      )}
+      {isLive && !isMlb && periodBits && (
+        <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">{periodBits}</p>
       )}
     </Link>
   );

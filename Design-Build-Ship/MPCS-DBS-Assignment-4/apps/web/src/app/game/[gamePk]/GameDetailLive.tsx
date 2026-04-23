@@ -7,9 +7,10 @@ import type { Game, Play, Team } from '@/lib/types';
 import TeamChip from '@/components/TeamChip';
 import ClutchBadge from '@/components/ClutchBadge';
 import LiveDot from '@/components/LiveDot';
+import SportBadge from '@/components/SportBadge';
 import WinProbChart from '@/components/WinProbChart';
 import PlayTimeline from '@/components/PlayTimeline';
-import { formatInning, formatStatus, formatWp } from '@/lib/format';
+import { formatStatus, formatWp } from '@/lib/format';
 
 export default function GameDetailLive({
   initialGame,
@@ -68,6 +69,9 @@ export default function GameDetailLive({
   const home = game.home_team_id ? teamMap.get(game.home_team_id) : undefined;
   const away = game.away_team_id ? teamMap.get(game.away_team_id) : undefined;
   const swingPlays = useMemo(() => plays.filter((p) => p.is_swing_play), [plays]);
+  const isMlb = game.sport === 'mlb';
+
+  const periodBits = [game.period_label, game.clock].filter(Boolean).join(' · ');
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
@@ -78,10 +82,11 @@ export default function GameDetailLive({
       <header className="mt-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
           <div className="flex items-center gap-2">
+            <SportBadge sport={game.sport} size="md" />
             {game.status === 'Live' ? <LiveDot /> : <span className="font-semibold">{formatStatus(game.status, game.detailed_state)}</span>}
-            {game.status === 'Live' && <span>· {formatInning(game.inning, game.is_top_inning)}</span>}
+            {game.status === 'Live' && periodBits && <span>· {periodBits}</span>}
           </div>
-          {game.status === 'Live' && <ClutchBadge value={game.clutch_index} />}
+          {game.status === 'Live' && isMlb && <ClutchBadge value={game.clutch_index} />}
         </div>
 
         <div className="mt-4 grid grid-cols-1 gap-6 sm:grid-cols-2">
@@ -89,19 +94,21 @@ export default function GameDetailLive({
             teamId={game.away_team_id}
             abbreviation={away?.abbreviation ?? '—'}
             name={away?.name ?? 'Away'}
+            logoUrl={away?.logo_url ?? null}
             score={game.away_score}
-            wp={game.home_win_prob == null ? null : 1 - game.home_win_prob}
+            wp={isMlb && game.home_win_prob != null ? 1 - game.home_win_prob : null}
           />
           <TeamBlock
             teamId={game.home_team_id}
             abbreviation={home?.abbreviation ?? '—'}
             name={home?.name ?? 'Home'}
+            logoUrl={home?.logo_url ?? null}
             score={game.home_score}
-            wp={game.home_win_prob}
+            wp={isMlb ? game.home_win_prob : null}
           />
         </div>
 
-        {game.status === 'Live' && (
+        {game.status === 'Live' && isMlb && (
           <dl className="mt-6 grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
             <Stat label="Batter" value={game.current_batter ?? '—'} />
             <Stat label="Pitcher" value={game.current_pitcher ?? '—'} />
@@ -117,12 +124,16 @@ export default function GameDetailLive({
                 .join(' · ') || 'None'}
             />
             <Stat label="Leverage" value={game.leverage?.toFixed(2) ?? '—'} />
-            <Stat
-              label="Home WP"
-              value={formatWp(game.home_win_prob)}
-            />
+            <Stat label="Home WP" value={formatWp(game.home_win_prob)} />
             <Stat label="Swing plays" value={swingPlays.length.toString()} />
             <Stat label="Plays logged" value={plays.length.toString()} />
+          </dl>
+        )}
+
+        {game.status === 'Live' && !isMlb && (
+          <dl className="mt-6 grid grid-cols-2 gap-4 text-sm">
+            <Stat label="Period" value={game.period_label ?? '—'} />
+            <Stat label="Clock" value={game.clock ?? '—'} />
           </dl>
         )}
 
@@ -134,23 +145,34 @@ export default function GameDetailLive({
         )}
       </header>
 
-      <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <h2 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100">
-          Win probability — {home?.abbreviation ?? 'HOME'}
-        </h2>
-        <WinProbChart
-          plays={plays}
-          homeAbbr={home?.abbreviation ?? 'HOME'}
-          awayAbbr={away?.abbreviation ?? 'AWAY'}
-        />
-      </section>
+      {isMlb && (
+        <>
+          <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <h2 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100">
+              Win probability — {home?.abbreviation ?? 'HOME'}
+            </h2>
+            <WinProbChart
+              plays={plays}
+              homeAbbr={home?.abbreviation ?? 'HOME'}
+              awayAbbr={away?.abbreviation ?? 'AWAY'}
+            />
+          </section>
 
-      <section className="mt-8">
-        <h2 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100">
-          Play timeline
-        </h2>
-        <PlayTimeline plays={plays} limit={20} />
-      </section>
+          <section className="mt-8">
+            <h2 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100">
+              Play timeline
+            </h2>
+            <PlayTimeline plays={plays} limit={20} />
+          </section>
+        </>
+      )}
+
+      {!isMlb && (
+        <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
+          Play-by-play analytics are MLB-only right now. NHL scoreboard data is
+          polled every 15 seconds and score updates stream in live above.
+        </section>
+      )}
     </div>
   );
 }
@@ -159,19 +181,26 @@ function TeamBlock({
   teamId,
   abbreviation,
   name,
+  logoUrl,
   score,
   wp,
 }: {
   teamId: number | null;
   abbreviation: string;
   name: string;
+  logoUrl: string | null;
   score: number;
   wp: number | null;
 }) {
   return (
     <div className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 p-4 dark:border-slate-800">
       <div className="flex items-center gap-3">
-        <TeamChip teamId={teamId} abbreviation={abbreviation} size="lg" />
+        {logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={logoUrl} alt={abbreviation} className="h-10 w-10 object-contain" />
+        ) : (
+          <TeamChip teamId={teamId} abbreviation={abbreviation} size="lg" />
+        )}
         <div>
           <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{name}</div>
           {wp != null && (
